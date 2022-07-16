@@ -1,5 +1,4 @@
 build/
-deps/
 *.sln
 .vs/
 *.rar
