@@ -1,15 +1,12 @@
-[submodule "deps/SDL2-2.0.22"]
-	path = deps/SDL2-2.0.22
+[submodule "ext/SDL2"]
+	path = ext/SDL2
 	url = https://github.com/libsdl-org/SDL.git
-
-[submodule "deps/SDL2_ttf-2.20.0"]
-	path = deps/SDL2_ttf-2.20.0
+[submodule "ext/SDL2_ttf"]
+	path = ext/SDL2_ttf
 	url = https://github.com/libsdl-org/SDL_ttf.git
-
-[submodule "deps/SDL2_mixer-2.6.1"]
-	path = deps/SDL2_mixer-2.6.1
+[submodule "ext/SDL2_mixer"]
+	path = ext/SDL2_mixer
 	url = https://github.com/libsdl-org/SDL_mixer.git
-
-[submodule "deps/SDL2_image-2.6.0"]
-	path = deps/SDL2_image-2.6.0
+[submodule "ext/SDL2_image"]
+	path = ext/SDL2_image
 	url = https://github.com/libsdl-org/SDL_image.git

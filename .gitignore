@@ -1,9 +1,10 @@
+assets/
 build/
+deps/
+x64/
 *.sln
 .vs/
 *.rar
-assets/
-x64/
 *.vcxproj
 *.vcxproj.*
 test.cpp
