@@ -1,0 +1,10 @@
+build/
+deps/
+*.sln
+.vs/
+*.rar
+assets/
+x64/
+*.vcxproj
+*.vcxproj.*
+test.cpp
