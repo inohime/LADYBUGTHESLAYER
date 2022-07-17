@@ -13,7 +13,7 @@ namespace gmtk {
 	Texture loadTexture(std::string_view filePath, SDL_Renderer *ren, SDL_Color *key = nullptr) {
 		SDL_Surface *surf = IMG_Load(filePath.data());
 		if (surf == nullptr) {
-			std::cout << "Failed to load texture \n";
+			std::cout << "Failed to load path: " << SDL_GetError() << '\n';
 			return nullptr;
 		}
 
@@ -22,7 +22,7 @@ namespace gmtk {
 
 		auto tex = std::shared_ptr<SDL_Texture>(SDL_CreateTextureFromSurface(ren, surf), SDL_DestroyTexture);
 		if (tex.get() == nullptr) {
-			std::cout << "Text texture failed to be created\n";
+			std::cout << "Texture failed to be created: " << SDL_GetError() << '\n';
 		}
 
 		SDL_FreeSurface(surf);
@@ -33,20 +33,20 @@ namespace gmtk {
 	Texture loadText(std::string_view msg, SDL_Renderer *ren, std::string_view fontFile, const SDL_Color &col, int fontSize) {
 		TTF_Font *font = TTF_OpenFont(fontFile.data(), fontSize);
 		if (font == nullptr) {
-			std::cout << "TTF_OpenFont error " << TTF_GetError() << "\n";
+			std::cout << "TTF_OpenFont error: " << TTF_GetError() << "\n";
 			return nullptr;
 		}
 
 		SDL_Surface *surf = TTF_RenderText_Blended(font, msg.data(), col);
 		if (surf == nullptr) {
 			TTF_CloseFont(font);
-			std::cout << "TTF_RenderText error " << TTF_GetError() << "\n";
+			std::cout << "TTF_RenderText error: " << TTF_GetError() << "\n";
 			return nullptr;
 		}
 
 		auto tex = std::shared_ptr<SDL_Texture>(SDL_CreateTextureFromSurface(ren, surf), SDL_DestroyTexture);
 		if (tex.get() == nullptr) {
-			std::cout << "Text texture failed to be created\n";
+			std::cout << "Text texture failed to be created: " << SDL_GetError() << '\n';
 		}
 
 		SDL_FreeSurface(surf);
@@ -58,13 +58,13 @@ namespace gmtk {
 	Texture loadTextOutline(std::string_view msg, SDL_Renderer *ren, std::string_view fontFile, const SDL_Color &col, int fontSize) {
 		TTF_Font *font = TTF_OpenFont(fontFile.data(), fontSize);
 		if (font == nullptr) {
-			std::cout << "TTF_OpenFont error " << TTF_GetError() << "\n";
+			std::cout << "TTF_OpenFont error: " << TTF_GetError() << "\n";
 			return nullptr;
 		}
 
 		TTF_Font *outlineFont = TTF_OpenFont(fontFile.data(), fontSize);
 		if (font == nullptr) {
-			std::cout << "TTF_OpenFont error " << TTF_GetError() << "\n";
+			std::cout << "TTF_OpenFont error: " << TTF_GetError() << "\n";
 			return nullptr;
 		}
 

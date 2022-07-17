@@ -7,102 +7,143 @@
 #include <chrono>
 #include <random>
 #include <string>
-//#include <unordered_map>
+#include <unordered_map>
 #include <map>
+#include <vector>
+
+/* LAYOUT
+x. MAP
+x. WALLS
+x. DICE
+x. ANIMATION
+x. PLAYER
+x. ENEMIES
+x. ATTACKS
+x. HUD
+*/
 
 namespace gmtk {
-	// this has no meaning, don't try to make sense of it.
 	class Bullet;
+	class Dice;
+	class Wall;
+	class Wasp;
+	class Spider;
+	class Frog;
 
 	namespace lightning {
 		PTR<SDL_Renderer> strike;
-		// test data below, don't keep here
-		std::vector<std::unique_ptr<Bullet>> bullets;
 		vec2f mousePos;
+		
+		//std::vector<std::unique_ptr<Bullet>> bullets;
+		//std::vector<std::unique_ptr<Dice>> dices;
+		std::vector<std::unique_ptr<Wall>> walls;
 	}
 
-	static std::mt19937_64 gen(std::random_device {}());
+	class Wall {
+	public:
+		Wall() {
+			wallTex = loadTexture("assets/wall.png", lightning::strike.get());
+		}
 
-	// add user interface
-	// add settings to do the following:
-	// -fullscreen, -volume change (music, chunk)
+		void draw() {
+			drawTexture(wallTex.get(), lightning::strike.get(), pos.x, pos.y);
+		}
+
+	public:
+		Texture wallTex;
+		vec2f pos;
+		SDL_FRect box;
+	};
 
 	class Animation {
 	public:
 		void addAnimation(std::string_view name, Texture spritesheet, int frames, int x, int y, int w, int h) {
+			int width, height;
+			SDL_QueryTexture(spritesheet.get(), nullptr, nullptr, &width, &height);
+
+			std::vector<SDL_Rect> rects;
+
 			for (int i = 0; i < frames; ++i) {
-				SDL_Rect newFrame = {(i + x) * w, y, w, h};
-				this->frames.insert({name.data(), newFrame});
+				SDL_Rect newFrame = {0};
+				newFrame = {(i + x) * w, y, w, h};
+				rects.emplace_back(newFrame);
 			}
+
+			this->frames.insert({name.data(), rects});
 
 			this->spritesheet = spritesheet;
 		}
 
-		void update(float speed, double dt) {
-			if (frames.size() > 0) {
+		constexpr uint32_t getCurrentFrame() {
+			return currentFrame;
+		}
+
+		void playAnimation(std::string_view animName, bool repeat) {
+			repeatAnim = repeat;
+			if (currentAnim != animName) {
+				currentAnim = animName;
+				currentFrame = 0;
+			}
+		}
+
+		void setFrameSpeed(float speed) {
+			frameDuration = speed;
+		}
+
+		void setScale(double x, double y) {
+			spriteScalar = vec2d(x, y);
+		}
+
+		void update(float dt) {
+			if (frames[currentAnim].size() > 0) {
 				timeElapsed += static_cast<float>(dt);
 
-				if (timeElapsed >= speed) {
-					timeElapsed = 0.0f;
-					currentFrame = (currentFrame + 1) % static_cast<int>(frames.size());
+				if (repeatAnim) {
+					if (timeElapsed >= frameDuration) {
+						timeElapsed = 0.0f;
+						currentFrame = (currentFrame + 1) % static_cast<int>(frames[currentAnim].size());
+					}
+				} else {
+					currentFrame = 0;
 				}
 			}
 		}
 
-		uint32_t getFrame(std::string_view frameName) {
-			//uint32_t frameIndex = std::distance(frames.begin(), frames.end(), frames.find(frameName.data()));
+		void draw(int x, int y) {
+			SDL_Rect clip = frames[currentAnim][currentFrame];
+			drawTexture(spritesheet.get(), lightning::strike.get(), x, y, &clip, spriteScalar.x, spriteScalar.y);
 		}
 
-		void setCurrentFrame(std::string_view frameName) {}
-
-	private:
+	public:
+		bool repeatAnim;
 		Texture spritesheet;
 		float timeElapsed {0.0f};
 		uint32_t currentFrame {0};
-		std::map<std::basic_string<char>, SDL_Rect> frames;
-	};
-
-	class Dice {
-	public:
-		// several dice types for modifiers
-		int rollSingleDice() {return dice(gen);}
-
-		std::pair<int, int> rollDualDice() {
-			return {dice(gen), dice(gen)};
-		}
-
-		std::tuple<int, int, int> rollTripleDice() {
-			return {dice(gen), dice(gen), dice(gen)};
-		}
-
-		std::tuple<int, int, int, int> rollQuadDice() {
-			return {dice(gen), dice(gen), dice(gen), dice(gen)};
-		}
-
-	private:
-		std::uniform_int_distribution<int> dice;
-	};
-
-	class DiceModifier : public Dice {
-	public:
-
-	private:
+		float frameDuration {100.0f};
+		std::basic_string<char> currentAnim;
+		std::unordered_map<std::basic_string<char>, std::vector<SDL_Rect>> frames;
+		vec2d spriteScalar {3, 3};
 	};
 
 	class Entity {
 	public:
 		virtual void draw() {}
 		virtual void update() {}
-
-		// for clarity
 		void setPosition(vec2f pos) { position = pos; }
+		bool hasIntersection(Entity &e1, Entity &e2) {
+			return SDL_HasIntersectionF(&e1.box, &e2.box);
+		}
+		
+		bool hasIntersection(Entity &e1, Wall &w1) {
+			return SDL_HasIntersectionF(&e1.box, &w1.box);
+		}
 
 		vec2f position;
 
 	protected:
 		std::basic_string<char> name;
 		vec2f velocity;
-		SDL_FRect collisionBox;
+		SDL_FRect box;
 		Animation anim;
 		Texture sprite;
 		int spriteWidth;
@@ -110,42 +151,14 @@ namespace gmtk {
 		int HP;
 	};
 
-	class Weapon {
+	class Bullet {
 	public:
-		virtual void draw() {}
-		virtual void update() {}
-
-		void setPosition(vec2f pos) { position = pos; }
-
-		vec2f position;
-
-	protected:
-		vec2f velocity;
-		SDL_FRect collisionBox;
-		Texture sprite;
-		int spriteWidth;
-		int spriteHeight;
-	};
-
-	class AI : public Entity {
-	public:
-
-	private:
-	};
-
-	class Wasp;
-	class Dragonfly;
-	class Spider;
-	class Frog;
-
-	class Bullet : public Weapon {
-	public:
-		Bullet() {
+		Bullet(vec2f &epos) {
 			sprite = loadTexture("assets/particle.png", lightning::strike.get());
 			SDL_QueryTexture(sprite.get(), nullptr, nullptr, &spriteWidth, &spriteHeight);
-			double angle = std::atan2((double)lightning::mousePos.y - position.y, (double)lightning::mousePos.x - position.x);
-			velocity = vec2f(1 * (float)std::cos(angle), 1 * (float)std::sin(angle));
-			collisionBox = {position.x, position.y, (float)spriteWidth, (float)spriteHeight};
+			double angle = std::atan2((double)epos.y - position.y, (double)epos.x - position.x);
+			velocity = vec2f(bulletSpeed * (float)std::cos(angle), bulletSpeed * (float)std::sin(angle));
+			box = {position.x, position.y, (float)spriteWidth, (float)spriteHeight};
 		}
 
 		void draw(int x, int y) {
@@ -154,9 +167,11 @@ namespace gmtk {
 
 		void update(float dt) {
 			position += vec2f(velocity.x, velocity.y);
-			collisionBox.x = position.x;
-			collisionBox.y = position.y;
+			box.x = position.x;
+			box.y = position.y;
 		}
+
+		vec2f position;
 
 	private:
 		friend class Wasp;
@@ -166,157 +181,62 @@ namespace gmtk {
 
 	private:
 		float lifetime {0.0f};
+		vec2f velocity;
+		SDL_FRect box;
+		Texture sprite;
+		int spriteWidth;
+		int spriteHeight;
+		int bulletSpeed;
 	};
-
-	class Sword : public Weapon {
-	public:
-		Sword() {}
-
-		void draw(int x, int y) {}
-		void update(float dt) {}
-
-	private:
-		int damage {0};
-	};
-
-	class Ladybug : public Entity {
-	public:
-		Ladybug() {
-			sprite = loadTexture("assets/warrior.png", lightning::strike.get());
-			// add animation here
-			UP = SDL_SCANCODE_W;
-			DOWN = SDL_SCANCODE_S;
-			LEFT = SDL_SCANCODE_A;
-			RIGHT = SDL_SCANCODE_D;
-		}
-
-		void draw() {
-			drawTexture(sprite.get(), lightning::strike.get(), position.x, position.y);
-		}
-
-		void update(float dt) {
-			const uint8_t *keystate = SDL_GetKeyboardState(NULL);
-
-			if (keystate[UP]) {
-				if (keystate[LEFT]) {
-					position.x -= 1.0f * dt;
-					position.y -= 1.0f * dt;
-				} else if (keystate[RIGHT]) {
-					position.x += 1.0f * dt;
-					position.y -= 1.0f * dt;
-				} else {
-					position.y -= 1.0f * dt;
-				}
-			}
-
-			if (keystate[DOWN]) {
-				if (keystate[LEFT]) {
-					position.x -= 1.0f * dt;
-					position.y += 1.0f * dt;
-				} else if (keystate[RIGHT]) {
-					position.x += 1.0f * dt;
-					position.y += 1.0f * dt;
-				} else {
-					position.y += 1.0f * dt;
-				}
-			}
-
-			if (!keystate[UP] && !keystate[DOWN] && !keystate[LEFT] && keystate[RIGHT]) {
-				position.x += 1.0f * dt;
-			}
-
-			if (!keystate[UP] && !keystate[DOWN] && keystate[LEFT] && !keystate[RIGHT]) {
-				position.x -= 1.0f * dt;
-			}
-		}
-
-		void attack() {}
-
-		void circleAttack() {}
-
-	private:
-		SDL_Scancode UP, DOWN, LEFT, RIGHT;
-		Sword theChosenOne;
-	};
-
-	class Aphid : public Entity {
-	public:
-		Aphid() {}
-
-		void draw(int x, int y) {}
-		void update(float dt) {}
-
-	private:
-	};
-
-	class Dragonfly : public Entity {
-	public:
-		Dragonfly() {}
-
-		void draw(int x, int y) {}
-		void update(float dt) {}
-
-	private:
-	};
-
-	class Wasp : public Entity {
-	public:
-		Wasp() {
-			sprite = loadTexture("assets/warrior.png", lightning::strike.get());
-		}
-
-		void draw(int x, int y) {
-			drawTexture(sprite.get(), lightning::strike.get(), x, y);
-		}
-
-		void update(float dt) {}
-
-	private:
-	};
-
-	class Spider : public Entity {
-	public:
-		Spider() {}
-
-		void draw(int x, int y) {}
-		void update(float dt) {}
-	};
-
-	class Frog : public Entity {
-	public:
-		Frog() {}
-
-		void draw(int x, int y) {}
-		void update(double dt) {}
-
-	private:
-	};
-
-	static double distanceBetweenEntities(const Entity &e1, const Entity &e2) {
-		double dist = std::abs(std::sqrt(std::pow(e2.position.x - e1.position.x, 2) + std::pow(e2.position.y - e1.position.y, 2)));
-		return dist;
-	}
-}
+} // namespace gmtk
 
 using namespace gmtk;
 
 int main(int, char **)
 {
+	constexpr int screenW = 1280, screenH = 720;
+
 	SDL_assert(SDL_Init(SDL_INIT_EVERYTHING) == 0);
 	SDL_assert(IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG) != 0);
 	if (TTF_Init() == -1) return false;
 
 	auto begin = std::chrono::steady_clock::now();
 
-	auto window = PTR<SDL_Window>(SDL_CreateWindow("Ladybug ", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1024, 768, 0));
+	auto window = PTR<SDL_Window>(SDL_CreateWindow("LADYBUGTHESLAYER", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screenW, screenH, 0));
 	lightning::strike = PTR<SDL_Renderer>(SDL_CreateRenderer(window.get(), -1, SDL_RENDERER_ACCELERATED));
 
-	auto ladybug = std::make_unique<Ladybug>();
-	ladybug->setPosition({100, 100});
+	auto background = loadTexture("assets/map.png", lightning::strike.get());
 
-	auto wasp = std::make_unique<Wasp>();
+	int tileSize = 32;
+	for (int i = 0; i < screenW / tileSize; i++) {
+		// top row
+		auto nwt = std::make_unique<Wall>();
+		nwt->pos = vec2f(i * tileSize, 0);
+		nwt->box = {nwt->pos.x, nwt->pos.y, (float)tileSize, (float)tileSize};
+		lightning::walls.push_back(std::move(nwt));
 
-	const double FPS = 240.0;
+		// bottom row
+		auto nwb = std::make_unique<Wall>();
+		nwb->pos = vec2f(i * tileSize, screenH - tileSize);
+		nwb->box = {nwb->pos.x, nwb->pos.y, (float)tileSize, (float)tileSize};
+		lightning::walls.push_back(std::move(nwb));
+	}
+
+	for (int j = 0; j < screenH / tileSize; j++) {
+		// right column
+		auto nwr = std::make_unique<Wall>();
+		nwr->pos = vec2f(screenW - tileSize, j * tileSize);
+		nwr->box = {nwr->pos.x, nwr->pos.y, (float)tileSize, (float)tileSize};
+		lightning::walls.push_back(std::move(nwr));
+
+		// left column
+		auto nwl = std::make_unique<Wall>();
+		nwl->pos = vec2f(0, j * tileSize);
+		nwl->box = {nwl->pos.x, nwl->pos.y, (float)tileSize, (float)tileSize};
+		lightning::walls.push_back(std::move(nwl));
+	}
+
+	const double FPS = 72.0;
 	const double delay = 1000.0 / FPS;
 
 	SDL_Event ev;
@@ -329,15 +249,13 @@ int main(int, char **)
 					break;
 
 				case SDL_MOUSEBUTTONDOWN: {
-					case SDL_BUTTON_LEFT: {
-						auto nb = std::make_unique<Bullet>();
-						lightning::bullets.push_back(std::move(nb));
-						std::cout << lightning::bullets.size() << '\n';
-					} break;
+					//case SDL_BUTTON_LEFT: {
+						 // for attacking
+					//} break;
 				} break;
 
 				case SDL_MOUSEMOTION:
-					lightning::mousePos = vec2f((float)ev.motion.x, (float)ev.motion.y);
+					//lightning::mousePos = vec2f((float)ev.motion.x, (float)ev.motion.y);
 					break;
 			}
 		}
@@ -345,20 +263,16 @@ int main(int, char **)
 		auto dt = std::chrono::duration<double, std::milli>(end - begin);
 		begin = end;
 
-		ladybug->update(static_cast<float>(dt.count()));
-		//wasp->update(static_cast<float>(dt.count()), &ev);
-
 		SDL_SetRenderDrawColor(lightning::strike.get(), 0, 0, 0, 255);
 		SDL_RenderClear(lightning::strike.get());
 
-		//wasp->draw(100, 100);
+		drawTexture(background.get(), lightning::strike.get(), 0, 0);
 
-		for (auto &bullet : lightning::bullets) {
-			bullet->draw(bullet->position.x, bullet->position.y);
-			bullet->update(static_cast<float>(dt.count()));
+		for (const auto &wall : lightning::walls) {
+			// check collision for all entities
+			//auto collide = SDL_HasIntersectionF(&, &wall->box);
+			wall->draw();
 		}
-
-		ladybug->draw();
 
 		SDL_RenderPresent(lightning::strike.get());
 
